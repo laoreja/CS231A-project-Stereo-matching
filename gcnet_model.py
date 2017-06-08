@@ -72,9 +72,9 @@ class GCNet(object):
   def build_graph_to_loss(self):
     self._build_model()
     self._build_loss_op()
-    self._add_loss_summaries()
+#    self._add_loss_summaries()
     self.variables_to_restore = tf.get_collection('variable_to_restore')
-    self.summaries = tf.summary.merge_all()
+#    self.summaries = tf.summary.merge_all()
 
 #  def build_graph(self):
 #    """Build a whole graph for the model."""
@@ -214,7 +214,8 @@ class GCNet(object):
 
   def _build_loss_op(self):
     with tf.variable_scope('loss'):
-      self.abs_loss = tf.reduce_sum(tf.abs((self.gt_disparity - self.predicted_disparity) * self.mask), name='abs_loss') / tf.reduce_sum(self.mask)
+      self.abs_loss = tf.reduce_sum(tf.abs((self.gt_disparity - self.predicted_disparity) * self.mask), name='abs_loss') / (tf.reduce_sum(self.mask) + 1)
+      self.debug_op_list.append(tf.reduce_sum(self.mask))
 #      tf.summary.scalar('abs_loss', self.abs_loss)
       self.total_loss = self.abs_loss + self._decay()
 #      tf.summary.scalar('total_loss', self.total_loss)
@@ -232,18 +233,19 @@ class GCNet(object):
     """
     # Compute the moving average of all individual losses and the total loss.
     loss_averages = tf.train.ExponentialMovingAverage(0.9, name='loss_avg')
-    self.loss_averages_op = loss_averages.apply([self.abs_loss, self.total_loss])
+    with tf.variable_scope(tf.get_variable_scope(), reuse=False):
+      self.loss_averages_op = loss_averages.apply([self.abs_loss, self.total_loss])
 
     # Attach a scalar summary to all individual losses and the total loss; do the
     # same for the averaged version of the losses.
     for l in [self.abs_loss, self.total_loss]:
       # Name each loss as '(raw)' and name the moving average version of the loss
       # as the original loss name.
-      tf.summary.scalar(l.op.name + ' (raw)', l)
+      tf.summary.scalar(l.op.name + '_raw', l)
       tf.summary.scalar(l.op.name, loss_averages.average(l))
 
-    self.avg_abs_loss = loss_averages.average(self.abs_loss)
-    self.avg_total_loss = loss_averages.average(self.total_loss)
+#    self.avg_abs_loss = loss_averages.average(self.abs_loss)
+#    self.avg_total_loss = loss_averages.average(self.total_loss)
 #    return loss_averages_op
     
   def _build_train_op(self, global_step):

@@ -47,7 +47,9 @@ tf.app.flags.DEFINE_boolean('log_device_placement', False,
 tf.app.flags.DEFINE_string('mode', 'train', 'train, resume, retrain')
 tf.app.flags.DEFINE_boolean('debug', False,
               """Whether to show verbose summaries.""")
-tf.app.flags.DEFINE_string('ckpt_path', '', "path of ckpt for resume training")              
+tf.app.flags.DEFINE_string('ckpt_path', '/home/laoreja/tf/log/gcnet_multi_gpu_2/train/', "path of ckpt for resume training")              
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 def tower_loss(scope, hps, dataset):
   """Calculate the total loss on a single tower running the CIFAR model.
@@ -69,11 +71,11 @@ def tower_loss(scope, hps, dataset):
   model = gcnet_model.GCNet(hps, left_images, right_images, disparitys, masks, 'train') # 
   model.build_graph_to_loss()
   
-  for l in [model.avg_abs_loss, model.avg_total_loss]:
-    loss_name = re.sub('%s_[0-9]*/' % gcnet_model.TOWER_NAME, '', l.op.name)
+  for l in [model.abs_loss, model.total_loss]:
+    loss_name = re.sub('%s_[0-9]*/' % gcnet_model.TOWER_NAME, '', l.op.name+'_main')
     tf.summary.scalar(loss_name, l)
     
-  return model.avg_total_loss, model.variables_to_restore
+  return model.total_loss, model.variables_to_restore#, model.debug_op_list[0]
   
 def average_gradients(tower_grads):
   """Calculate the average gradient for each shared variable across all towers.
@@ -132,6 +134,7 @@ def train(hps, dataset):
       
     tower_grads = []
     total_variables_to_restore = []
+#    debug_ops = []
 #    tower_losses = []
     with tf.variable_scope(tf.get_variable_scope()):
       for i in xrange(FLAGS.num_gpus):
@@ -139,6 +142,7 @@ def train(hps, dataset):
           with tf.name_scope('%s_%d' % (gcnet_model.TOWER_NAME, i)) as scope:
             loss, tmp_variables_to_restore = tower_loss(scope, hps, dataset)
             total_variables_to_restore.extend(tmp_variables_to_restore)
+#            debug_ops.append(debug_op)
 #            tower_losses.append(loss)
             
             # Reuse variables for the next tower.
@@ -160,7 +164,7 @@ def train(hps, dataset):
     
     # Add a summary to track the learning rate.
 #    summaries.append(tf.summary.scalar('learning_rate', lrn_rate))    
-    summaries.append(model.summaries)
+#    summaries.append(model.summaries)
     
     if FLAGS.debug:
       # Add histograms for gradients.
@@ -200,31 +204,24 @@ def train(hps, dataset):
       allow_soft_placement=True,
       log_device_placement=FLAGS.log_device_placement))
     
+    print("before sess init")
     sess.run(init)
-    
-    assert tf.gfile.Exists(FLAGS.ckpt_path)
-    variables_to_restore = tf.get_collection(
-        slim.variables.VARIABLES_TO_RESTORE)
-    restorer = tf.train.Saver(variables_to_restore)
-    restorer.restore(sess, FLAGS.pretrained_model_checkpoint_path)
-    print('%s: Pre-trained model restored from %s' %
-          (datetime.now(), FLAGS.pretrained_model_checkpoint_path))
-    
+    tf.logging.info("after sess.run(init)")
+    print("before read ckpt")    
     
     if FLAGS.mode == 'resume':
       assert tf.gfile.Exists(FLAGS.ckpt_path)
-      saver.restore(sess, FLAGS.ckpt_path)
+      saver.restore(sess, tf.train.latest_checkpoint(FLAGS.ckpt_path))
       print('%s: Resume from %s' %
-        (datetime.now(), FLAGS.pretrained_model_checkpoint_path))
+        (datetime.now(), FLAGS.ckpt_path))
     elif FLAGS.mode == 'retrain':
       assert tf.gfile.Exists(FLAGS.ckpt_path)
       restorer = tf.train.Saver(total_variables_to_restore)
-      restorer.restore(sess, FLAGS.ckpt_path)
+      restorer.restore(sess, tf.train.latest_checkpoint(FLAGS.ckpt_path))
       print('%s: Pre-trained model restored from %s' %
-            (datetime.now(), FLAGS.pretrained_model_checkpoint_path))
+            (datetime.now(), FLAGS.ckpt_path))
 
 
-    
     # Start the queue runners.
     tf.train.start_queue_runners(sess=sess)
     
@@ -236,7 +233,7 @@ def train(hps, dataset):
         if FLAGS.debug:
           run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
           run_metadata = tf.RunMetadata()
-          _, loss_value = sess.run([train_op, loss],
+          _, loss_value = sess.run([train_op,  loss],
                                     options=run_options,
                                     run_metadata=run_metadata)
           summary_writer.add_run_metadata(run_metadata, 'step%03d' % step)
@@ -276,13 +273,14 @@ def main(_):
   assert dataset.data_files()
 
   FLAGS.train_dir = os.path.join(FLAGS.log_root, 'train')
-  if tf.gfile.Exists(FLAGS.train_dir):
-    print(FLAGS.train_dir)
-    res = input('FLAGS.train_dir already exist, whether to delete? Y/[N]')
-    if res == 'Y':
-      tf.gfile.DeleteRecursively(FLAGS.train_dir)
-      tf.gfile.MakeDirs(FLAGS.train_dir)
-  else:
+#  if tf.gfile.Exists(FLAGS.train_dir):
+#    print(FLAGS.train_dir)
+#    res = raw_input('FLAGS.train_dir already exist, whether to delete? Y/[N]')
+#    if res == 'Y':
+#      tf.gfile.DeleteRecursively(FLAGS.train_dir)
+#      tf.gfile.MakeDirs(FLAGS.train_dir)
+#  else:
+  if not tf.gfile.Exists(FLAGS.train_dir):
     tf.gfile.MakeDirs(FLAGS.train_dir)
 
   hps = gcnet_model.HParams(batch_size=BATCH_SIZE,
@@ -292,10 +290,12 @@ def main(_):
                              relu_leakiness=0.1,
                              optimizer='RMSProp',
                              max_disparity=192) 
-
+  print("before train")
   train(hps, dataset)
 
 
 if __name__ == '__main__':
-  tf.logging.set_verbosity(tf.logging.INFO)
+  print("in main")
+  tf.logging.info("in main info")
+  tf.logging.set_verbosity(tf.logging.DEBUG)
   tf.app.run()
