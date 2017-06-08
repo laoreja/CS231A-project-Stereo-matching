@@ -72,7 +72,9 @@ class GCNet(object):
   def build_graph_to_loss(self):
     self._build_model()
     self._build_loss_op()
-#    self._add_loss_summaries()
+    self._add_loss_summaries()
+    self.variables_to_restore = tf.get_collection('variable_to_restore')
+    self.summaries = tf.summary.merge_all()
 
 #  def build_graph(self):
 #    """Build a whole graph for the model."""
@@ -103,16 +105,16 @@ class GCNet(object):
         left_x = self._conv('conv', left_x, 5, 3, 32, self._stride_arr(2))
         left_x = self._relu(left_x, self.hps.relu_leakiness)
         left_x = self._batch_norm('bn', left_x)
-      tf.add_to_collection('shapes', tf.shape(left_x))
+#      tf.add_to_collection('shapes', tf.shape(left_x))
         
       for i in six.moves.range(8):
         left_x, layer_idx = self._unary_feat_residual(left_x, 3, 32, 32, self._stride_arr(1), layer_idx)
-        tf.add_to_collection('shapes', tf.shape(left_x))
+#        tf.add_to_collection('shapes', tf.shape(left_x))
     
       with tf.variable_scope('layer_'+str(layer_idx)):
         layer_idx += 1
         left_x = self._conv('conv', left_x, 3, 32, 32, self._stride_arr(1))
-      tf.add_to_collection('shapes', tf.shape(left_x))
+      #tf.add_to_collection('shapes', tf.shape(left_x))
     
     layer_idx = 1    
     with tf.variable_scope('unary_features', reuse=True):
@@ -145,8 +147,7 @@ class GCNet(object):
                                         ))
       right_cost_volume = tf.stack(right_cost_volume, axis=1, name='right_stack')
       x = tf.concat([left_cost_volume, right_cost_volume], 4)
-#      self.cost_volume_shape_op = tf.shape(x)
-      tf.add_to_collection('shapes', tf.shape(x))
+      #tf.add_to_collection('shapes', tf.shape(x))
       
           
     with tf.variable_scope('learning_regularization'):
@@ -158,7 +159,7 @@ class GCNet(object):
       out_filters_stride_2 = [64, 64, 64, 128]
       for i in six.moves.range(4):
         tmp_x, layer_idx = self._regularization_subsample(x, 3, in_filters[i], out_filters[i], self._stride_3d_arr(1), layer_idx)
-        tf.add_to_collection('shapes', tf.shape(tmp_x))
+#        tf.add_to_collection('shapes', tf.shape(tmp_x))
         stored_features.append(tmp_x)
 #        stored_features[i] = tmp_x
 #        self._extra_train_ops.append(stored_features[i].assign(tmp_x)) ## it's an op, how to add it to the graph?
@@ -168,7 +169,7 @@ class GCNet(object):
           x = self._conv3d('conv3d', x, 3, in_filters_stride_2[i], out_filters_stride_2[i], self._stride_3d_arr(2))
           x = self._relu(x, self.hps.relu_leakiness)
           x = self._batch_norm('bn', x)
-          tf.add_to_collection('shapes', tf.shape(x))
+#          tf.add_to_collection('shapes', tf.shape(x))
 
       
       assert stored_features[0] is not stored_features[1]
@@ -179,42 +180,41 @@ class GCNet(object):
           x = self._conv3d('conv3d', x, 3, 128, 128, self._stride_3d_arr(1))
           x = self._relu(x, self.hps.relu_leakiness)
           x = self._batch_norm('bn', x)
-          tf.add_to_collection('shapes', tf.shape(x))
+#          tf.add_to_collection('shapes', tf.shape(x))
 
       transposed_in_filters = [128, 64, 64, 64]
       transposed_out_filters = [64, 64, 64, 32]
       
       for i in six.moves.range(4):
         x, layer_idx = self._regularization_upsample(x, stored_features[-i-1], 3, transposed_in_filters[i], transposed_out_filters[i], self._stride_3d_arr(2), layer_idx)
-        tf.add_to_collection('shapes', tf.shape(x))
+#        tf.add_to_collection('shapes', tf.shape(x))
       
       with tf.variable_scope('layer_'+str(layer_idx)):
         layer_idx += 1
         input_shape = tf.shape(self.gt_disparity)
         x = self._conv3d_trans('conv_trans', x, 3, 32, 1, self._stride_3d_arr(2), [input_shape[0], self.hps.max_disparity+1, input_shape[1], input_shape[2], 1])
-        tf.add_to_collection('shapes', tf.shape(x))
-        self.debug_op_list.append(tf.shape(x))
+#        tf.add_to_collection('shapes', tf.shape(x))
 
     
     with tf.variable_scope('soft_argmin'):
         x = tf.squeeze(x, squeeze_dims=[4], name='squeeze')
-        tf.add_to_collection('shapes', tf.shape(x))
+#        tf.add_to_collection('shapes', tf.shape(x))
         x = tf.transpose(x, perm=[0, 2, 3, 1], name='transpose')
-        tf.add_to_collection('shapes', tf.shape(x))
+#        tf.add_to_collection('shapes', tf.shape(x))
         x = tf.nn.softmax(x, dim=-1, name='softmax')
-        tf.add_to_collection('shapes', tf.shape(x))
+#        tf.add_to_collection('shapes', tf.shape(x))
 
         multiplier = tf.range(0, self.hps.max_disparity+1, dtype=tf.float32, name='depth_range')
         x = tf.multiply(x, multiplier, name='softmax_mul_depth')
-        tf.add_to_collection('shapes', tf.shape(x))
+#        tf.add_to_collection('shapes', tf.shape(x))
         self.predicted_disparity = tf.reduce_sum(x, axis=3, name='reduce_sum')       
-        tf.add_to_collection('shapes', tf.shape(self.predicted_disparity))
-    self.shapes = tf.get_collection('shapes')
-    self.debug_op_list.append(self.shapes)
+#        tf.add_to_collection('shapes', tf.shape(self.predicted_disparity))
+#    self.shapes = tf.get_collection('shapes')
+#    self.debug_op_list.append(self.shapes)
 
   def _build_loss_op(self):
     with tf.variable_scope('loss'):
-      self.abs_loss = tf.reduce_mean(tf.abs((self.gt_disparity - self.predicted_disparity) * self.mask), name='abs_loss')
+      self.abs_loss = tf.reduce_sum(tf.abs((self.gt_disparity - self.predicted_disparity) * self.mask), name='abs_loss') / tf.reduce_sum(self.mask)
 #      tf.summary.scalar('abs_loss', self.abs_loss)
       self.total_loss = self.abs_loss + self._decay()
 #      tf.summary.scalar('total_loss', self.total_loss)
@@ -242,6 +242,8 @@ class GCNet(object):
       tf.summary.scalar(l.op.name + ' (raw)', l)
       tf.summary.scalar(l.op.name, loss_averages.average(l))
 
+    self.avg_abs_loss = loss_averages.average(self.abs_loss)
+    self.avg_total_loss = loss_averages.average(self.total_loss)
 #    return loss_averages_op
     
   def _build_train_op(self, global_step):
@@ -367,8 +369,6 @@ class GCNet(object):
           'DW', [filter_size, filter_size, filter_size, out_filters, in_filters],
             initializer=tf.random_normal_initializer(
               stddev=np.sqrt(2.0/n)))
-      x_shape = tf.shape(x)
-      self.debug_op_list.append(tf.shape(kernel))
       return tf.nn.conv3d_transpose(
                 x, 
                 kernel, 
@@ -440,6 +440,7 @@ class GCNet(object):
     """
     with tf.device('/cpu:0'):
       var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype, trainable=trainable)
+      tf.add_to_collection("variable_to_restore", var)
     return var
 
 #  def _fully_connected(self, x, out_dim):
