@@ -71,6 +71,7 @@ python gcnet_eval.py --log_root xxx --checkpoint_dir xxx --run_once True 2>&1 | 
 * For the with-mask-version (the without-mask-version is still training), During evaluation, if using a fixed mean and variance (during training, we would estimate a mean and variance, this is what the Resnet model do), the results are terrible. If changing that, using the real-time mean and variance, results are better.
 
 One bad results:
+
 <img src="https://raw.githubusercontent.com/laoreja/CS231A-project-stereo-matching/master/qualitative_results/SceneFlow_train_with_mask/wrong_left.png" width=290px/> <img src="https://raw.githubusercontent.com/laoreja/CS231A-project-stereo-matching/master/qualitative_results/SceneFlow_train_with_mask/wrong_gt.png" width=290px/> <img src="https://raw.githubusercontent.com/laoreja/CS231A-project-stereo-matching/master/qualitative_results/SceneFlow_train_with_mask/wrong_predict.png" width=290px/>
 
 However, using fixed mean and variance should be the more common practice, I don't know what's goes on.
