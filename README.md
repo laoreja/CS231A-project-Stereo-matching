@@ -82,7 +82,7 @@ Besides, if I use H=540 and W=960, the GPU memory is not enough. So what I met i
 
 The GPU I use is TITAN X, 12G memory is not small. I wonder how the authors manage to do so (they also say they use TITAN X GPU).
 
-* The evaluation runs extremely slowly on CPU, but runs well on GPU. I located the problem to the last `conv3d_transpose` layer. I think this is a problem with TensorFlow, so raised an [issue](https://github.com/tensorflow/tensorflow/issues/10535).
+* The evaluation runs extremely slowly on CPU, but runs well on GPU. I located the problem to the last `conv3d_transpose` layer. I think this is a problem with TensorFlow, so I raised an [issue](https://github.com/tensorflow/tensorflow/issues/10535).
 
 <!-- Since it's my first time using TensorFlow, I met lots of problems. In my experience playing with other frameworks, the common practice is to do validation after training some epochs. But for TensorFlow, someone says it's better and safer using separate processes, and we can use CPU to do validation. If the CPU performance is not good, then it will work -->
 
