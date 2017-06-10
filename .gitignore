@@ -15,4 +15,5 @@ gcnet_test_kitti.py
 image_processing_eval.py
 resnet_*
 stereo_input.py
-
+README_resnet.md
+g3doc/*
