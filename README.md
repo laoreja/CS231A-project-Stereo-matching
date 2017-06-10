@@ -86,4 +86,7 @@ The GPU I use is TITAN X, 12G memory is not small. I wonder how the authors mana
 
 <!-- Since it's my first time using TensorFlow, I met lots of problems. In my experience playing with other frameworks, the common practice is to do validation after training some epochs. But for TensorFlow, someone says it's better and safer using separate processes, and we can use CPU to do validation. If the CPU performance is not good, then it will work -->
 
+## More details
+
+For more details, please refer to the `final_report.pdf` and `supplemental.pdf` in this repo.
 
