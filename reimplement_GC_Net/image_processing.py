@@ -90,9 +90,9 @@ def inputs(dataset, batch_size=None, num_preprocess_threads=None):
       None defaults to FLAGS.num_preprocess_threads.
 
   Returns:
-    left_images, right_images: Images. 4D tensor of size [batch_size, FLAGS.image_size,
-                                       image_size, 3].
-    disparitys, masks: 3D tensor of size [batch_size, FLAGS.image_size, image_size].
+    left_images, right_images: Images. 4D tensor of size [batch_size, FLAGS.cropped_height,
+                cropped_width, 3].
+    disparitys, masks: 3D tensor of size [batch_size, FLAGS.cropped_height, cropped_width].
   """
   if not batch_size:
     batch_size = FLAGS.batch_size
@@ -119,9 +119,9 @@ def distorted_inputs(dataset, batch_size=None, num_preprocess_threads=None):
       None defaults to FLAGS.num_preprocess_threads.
 
   Returns:
-    left_images, right_images: Images. 4D tensor of size [batch_size, FLAGS.image_size,
-                       image_size, 3].
-    disparitys, masks: 3D tensor of size [batch_size, FLAGS.image_size, image_size].
+    left_images, right_images: Images. 4D tensor of size [batch_size, FLAGS.cropped_height,
+                       cropped_width, 3].
+    disparitys, masks: 3D tensor of size [batch_size, FLAGS.cropped_height, cropped_width].
   """
   if not batch_size:
     batch_size = FLAGS.batch_size
@@ -149,7 +149,6 @@ def eval_image(image):
   # the original image.
 #  image = tf.image.central_crop(image, central_fraction=0.875)
 
-  # Resize the image to the original height and width.
   image = tf.expand_dims(image, 0)
   image = tf.image.resize_image_with_crop_or_pad(image, FLAGS.cropped_height, FLAGS.cropped_width)
   image = tf.squeeze(image, [0])
@@ -160,18 +159,16 @@ def image_preprocessing(left_image, right_image, disparity, mask, train):
   """Decode and preprocess one image for evaluation or training.
 
   Args:
-    image_buffer: JPEG encoded string Tensor
-    bbox: 3-D float Tensor of bounding boxes arranged [1, num_boxes, coords]
-      where each coordinate is [0, 1) and the coordinates are arranged as
-      [ymin, xmin, ymax, xmax].
+    left_image, right_image, mask: decoded image, dtype:tf.uint8
+    disparity: decoded disparity, dtype:tf.float32
     train: boolean
-    thread_id: integer indicating preprocessing thread
 
   Returns:
-    3-D float Tensor containing an appropriately scaled image
-
-  Raises:
-    ValueError: if user does not provide bounding box
+    left_image, right_image, disparity, mask:3-D float Tensors
+        all are cropped, 
+          if training: random crop, 
+          if testing: center crop
+        images are normalized to range [-1, 1]
   """
   with tf.name_scope('image_preprocessing'):
     image_shape = tf.stack([FLAGS.image_height, FLAGS.image_width, FLAGS.depth])
@@ -209,37 +206,23 @@ def image_preprocessing(left_image, right_image, disparity, mask, train):
 def parse_example_proto(example_serialized):
   """Parses an Example proto containing a training example of an image.
 
-  The output of the build_image_data.py image preprocessing script is a dataset
+  The output of the build_image_data_SceneFlow.py image preprocessing script is a dataset
   containing serialized Example protocol buffers. Each Example proto contains
   the following fields:
 
-    image/height: 462
-    image/width: 581
-    image/colorspace: 'RGB'
-    image/channels: 3
-    image/class/label: 615
-    image/class/synset: 'n03623198'
-    image/class/text: 'knee pad'
-    image/object/bbox/xmin: 0.1
-    image/object/bbox/xmax: 0.9
-    image/object/bbox/ymin: 0.2
-    image/object/bbox/ymax: 0.6
-    image/object/bbox/label: 615
-    image/format: 'JPEG'
-    image/filename: 'ILSVRC2012_val_00041207.JPEG'
-    image/encoded: <JPEG encoded string>
+    left_image_raw: string containing encoded image in RGB colorspace
+    right_image_raw: string containing encoded image in RGB colorspace
+    disparity_raw: string containing float formatted grount-truth disparity
+    mask_raw: string containing unit8 formatted grount-truth disparity mask
 
   Args:
     example_serialized: scalar Tensor tf.string containing a serialized
       Example protocol buffer.
 
   Returns:
-    image_buffer: Tensor tf.string containing the contents of a JPEG file.
-    label: Tensor tf.int32 containing the label.
-    bbox: 3-D float Tensor of bounding boxes arranged [1, num_boxes, coords]
-      where each coordinate is [0, 1) and the coordinates are arranged as
-      [ymin, xmin, ymax, xmax].
-    text: Tensor tf.string containing the human-readable label.
+    left_image, right_image, mask: decoded image, dtype:tf.uint8
+    disparity: decoded disparity, dtype:tf.float32
+    
   """
   # Dense features in Example proto.
   feature_map = {
@@ -274,8 +257,9 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
     num_readers: integer, number of parallel readers
 
   Returns:
-    images: 4-D float Tensor of a batch of images
-    labels: 1-D integer Tensor of [batch_size].
+    left_images, right_images: Images. 4D tensor of size [batch_size, FLAGS.image_size,
+                image_size, 3].
+    disparitys, masks: 3D tensor of size [batch_size, FLAGS.image_size, image_size].
 
   Raises:
     ValueError: if data is not found

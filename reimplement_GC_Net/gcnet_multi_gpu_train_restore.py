@@ -269,6 +269,7 @@ def train(hps, dataset):
         tf.logging.info(format_str % (datetime.now(), step, loss_value,
                              examples_per_sec, sec_per_batch))
 
+
       # Save the model checkpoint periodically.
       if step % 1000 == 0 or (step + 1) == FLAGS.max_steps:
         checkpoint_path = os.path.join(FLAGS.train_dir, 'model.ckpt')

@@ -25,16 +25,11 @@
 
  -- Data processing:
  parse_example_proto: Parses an Example proto containing a training example
-   of an image.
-
- -- Image decoding:
- decode_jpeg: Decode a JPEG encoded string into a 3-D float32 Tensor.
+  of an image.
 
  -- Image preprocessing:
  image_preprocessing: Decode and preprocess one image for evaluation or training
- distort_image: Distort one image for training a network.
- eval_image: Prepare one image for evaluation.
- distort_color: Distort the color in one image for training.
+ eval_image: resize images
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -81,12 +76,12 @@ tf.app.flags.DEFINE_integer('input_queue_memory_factor', 16,
 print("import image processing")
 
 def inputs(dataset, batch_size=None, num_preprocess_threads=None):
-  """Generate batches of ImageNet images for evaluation.
+  """Generate batches of KITTI images for evaluation.
 
   Use this function as the inputs for evaluating a network.
 
   Note that some (minimal) image preprocessing occurs during evaluation
-  including central cropping and resizing of the image to fit the network.
+  including central cropping.
 
   Args:
     dataset: instance of Dataset class specifying the dataset.
@@ -95,9 +90,8 @@ def inputs(dataset, batch_size=None, num_preprocess_threads=None):
       None defaults to FLAGS.num_preprocess_threads.
 
   Returns:
-    images: Images. 4D tensor of size [batch_size, FLAGS.image_size,
-                                       image_size, 3].
-    labels: 1-D integer Tensor of [FLAGS.batch_size].
+    left_images, right_images: Images. 4D tensor of size [batch_size, FLAGS.half_height, FLAGS.half_width, 3].
+    disparitys, masks: 3D tensor of size [batch_size, FLAGS.half_height, FLAGS.half_width].
   """
   if not batch_size:
     batch_size = FLAGS.batch_size
@@ -113,13 +107,9 @@ def inputs(dataset, batch_size=None, num_preprocess_threads=None):
 
 
 def distorted_inputs(dataset, batch_size=None, num_preprocess_threads=None):
-  """Generate batches of distorted versions of ImageNet images.
+  """Generate batches of distorted versions of KITTI images.
 
   Use this function as the inputs for training a network.
-
-  Distorting images provides a useful technique for augmenting the data
-  set during training in order to make the network invariant to aspects
-  of the image that do not effect the label.
 
   Args:
     dataset: instance of Dataset class specifying the dataset.
@@ -128,9 +118,8 @@ def distorted_inputs(dataset, batch_size=None, num_preprocess_threads=None):
       None defaults to FLAGS.num_preprocess_threads.
 
   Returns:
-    images: Images. 4D tensor of size [batch_size, FLAGS.image_size,
-                                       FLAGS.image_size, 3].
-    labels: 1-D integer Tensor of [batch_size].
+    left_images, right_images: Images. 4D tensor of size [batch_size, FLAGS.half_height, FLAGS.half_width, 3].
+    disparitys, masks: 3D tensor of size [batch_size, FLAGS.half_height, FLAGS.half_width].
   """
   if not batch_size:
     batch_size = FLAGS.batch_size
@@ -147,13 +136,10 @@ def distorted_inputs(dataset, batch_size=None, num_preprocess_threads=None):
 
 
 def eval_image(image):
-  """Prepare one image for evaluation.
+  """Resize images
 
   Args:
     image: 3-D float Tensor
-    height: integer
-    width: integer
-    scope: Optional scope for name_scope.
   Returns:
     3-D float Tensor of prepared image.
   """
@@ -172,18 +158,14 @@ def image_preprocessing(left_image, right_image, disparity, mask, height, width)
   """Decode and preprocess one image for evaluation or training.
 
   Args:
-    image_buffer: JPEG encoded string Tensor
-    bbox: 3-D float Tensor of bounding boxes arranged [1, num_boxes, coords]
-      where each coordinate is [0, 1) and the coordinates are arranged as
-      [ymin, xmin, ymax, xmax].
+    left_image, right_image, mask: decoded image, dtype:tf.uint8
+    disparity: decoded disparity, dtype:tf.float32
     train: boolean
-    thread_id: integer indicating preprocessing thread
 
   Returns:
-    3-D float Tensor containing an appropriately scaled image
-
-  Raises:
-    ValueError: if user does not provide bounding box
+    left_image, right_image, disparity, mask:3-D float Tensors
+        Since the H and W are too large, I divide the images into 4 parts, each with size H/2 * W/2
+        images are normalized to range [-1, 1]
   """
   with tf.name_scope('image_preprocessing'):
     image_shape = tf.stack([height, width, FLAGS.depth])
@@ -249,37 +231,33 @@ def image_preprocessing(left_image, right_image, disparity, mask, height, width)
 def parse_example_proto(example_serialized, train):
   """Parses an Example proto containing a training example of an image.
 
-  The output of the build_image_data.py image preprocessing script is a dataset
+  The output of the build_image_data_KITTI.py image preprocessing script is a dataset
   containing serialized Example protocol buffers. Each Example proto contains
   the following fields:
 
-    image/height: 462
-    image/width: 581
-    image/colorspace: 'RGB'
-    image/channels: 3
-    image/class/label: 615
-    image/class/synset: 'n03623198'
-    image/class/text: 'knee pad'
-    image/object/bbox/xmin: 0.1
-    image/object/bbox/xmax: 0.9
-    image/object/bbox/ymin: 0.2
-    image/object/bbox/ymax: 0.6
-    image/object/bbox/label: 615
-    image/format: 'JPEG'
-    image/filename: 'ILSVRC2012_val_00041207.JPEG'
-    image/encoded: <JPEG encoded string>
+    for both training and testing:
+      left_image_raw: string containing encoded image in RGB colorspace
+      right_image_raw: string containing encoded image in RGB colorspace
+      height: integer, image height in pixels
+      width: integer, image width in pixels
+
+    training only:
+      disparity_raw: string containing float formatted grount-truth disparity
+      mask_raw: string containing unit8 formatted grount-truth disparity mask
+
+    testing only:
+      filename: string containing the basename of the image file
+                following the KITTI naming rule, is 'xxxxxx_10.png'
+      subset_idx: integer, indicating which subset, 0 for KITTI(2012), 1 for KITTI2015
+
 
   Args:
     example_serialized: scalar Tensor tf.string containing a serialized
       Example protocol buffer.
 
   Returns:
-    image_buffer: Tensor tf.string containing the contents of a JPEG file.
-    label: Tensor tf.int32 containing the label.
-    bbox: 3-D float Tensor of bounding boxes arranged [1, num_boxes, coords]
-      where each coordinate is [0, 1) and the coordinates are arranged as
-      [ymin, xmin, ymax, xmax].
-    text: Tensor tf.string containing the human-readable label.
+    left_image, right_image, mask: decoded image, dtype:tf.uint8
+    disparity: decoded disparity, dtype:tf.float32
   """
   # Dense features in Example proto.
   if train:
@@ -333,8 +311,9 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
     num_readers: integer, number of parallel readers
 
   Returns:
-    images: 4-D float Tensor of a batch of images
-    labels: 1-D integer Tensor of [batch_size].
+    left_images, right_images: Images. 4D tensor of size [batch_size, FLAGS.image_size,
+                image_size, 3].
+    disparitys, masks: 3D tensor of size [batch_size, FLAGS.image_size, image_size].
 
   Raises:
     ValueError: if data is not found
@@ -356,9 +335,9 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
     if num_preprocess_threads is None:
       num_preprocess_threads = FLAGS.num_preprocess_threads
 
-#    if num_preprocess_threads % 4:
-#      raise ValueError('Please make num_preprocess_threads a multiple '
-#                       'of 4 (%d % 4 != 0).', num_preprocess_threads)
+    if num_preprocess_threads % 4:
+      raise ValueError('Please make num_preprocess_threads a multiple '
+                       'of 4 (%d % 4 != 0).', num_preprocess_threads)
 
     if num_readers is None:
       num_readers = FLAGS.num_readers
@@ -369,22 +348,21 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
     # Approximate number of examples per shard.
     train_examples_per_shard = 50
     test_examples_per_shard = 50
-    examples_per_shard = 50
     # Size the random shuffle queue to balance between good global
     # mixing (more examples) and memory use (fewer examples).
     # 1 image uses 299*299*3*4 bytes = 1MB
     # The default input_queue_memory_factor is 16 implying a shuffling queue
     # size: examples_per_shard * 16 * 1MB = 17.6GB
     min_queue_examples = train_examples_per_shard * FLAGS.input_queue_memory_factor
-#    if train:
-#      examples_queue = tf.RandomShuffleQueue(
-#          capacity=min_queue_examples + 3 * batch_size,
-#          min_after_dequeue=min_queue_examples,
-#          dtypes=[tf.string])
-#    else:
-    examples_queue = tf.FIFOQueue(
-        capacity=examples_per_shard + 3 * batch_size,
-        dtypes=[tf.string])
+    if train:
+      examples_queue = tf.RandomShuffleQueue(
+          capacity=min_queue_examples + 3 * batch_size,
+          min_after_dequeue=min_queue_examples,
+          dtypes=[tf.string])
+    else:
+      examples_queue = tf.FIFOQueue(
+          capacity=test_examples_per_shard + 3 * batch_size,
+          dtypes=[tf.string])
 
     # Create multiple readers to populate the queue of examples.
     if num_readers > 1:
@@ -446,9 +424,7 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
 #        tf.summary.image('right_images', right_images)
         return left_images, right_images, filenames, subset_idxs
         
-#    shape_op = tf.shape(left_images)
 
-    # Display the training images in the visualizer.
 
 
 
