@@ -13,22 +13,8 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Evaluation for CIFAR-10.
-
-Accuracy:
-cifar10_train.py achieves 83.0% accuracy after 100K steps (256 epochs
-of data) as judged by cifar10_eval.py.
-
-Speed:
-On a single Tesla K40, cifar10_train.py processes a single batch of 128 images
-in 0.25-0.35 sec (i.e. 350 - 600 images /sec). The model reaches ~86%
-accuracy after 100K steps in 8 hours of training time.
-
-Usage:
-Please see the tutorial and website for how to download the CIFAR-10
-data set, compile the program and train the model.
-
-http://tensorflow.org/tutorials/deep_cnn/
+"""
+Evaluation for GC-Net on KITTI.
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -50,11 +36,10 @@ FLAGS = tf.app.flags.FLAGS
 BATCH_SIZE = 1
 #NUM_EVAL_SAMPLES = 4843
 
-#tf.app.flags.DEFINE_string('dataset', 'SceneFlow', '')
+#tf.app.flags.DEFINE_string('dataset', 'KITTI', '')
 tf.app.flags.DEFINE_string('mode', 'eval', 'mode')
 tf.app.flags.DEFINE_boolean('debug', False,
               """Whether to show verbose summaries.""")
-
 tf.app.flags.DEFINE_string('log_root', '/home/laoreja/tf/log/kitti_from_retrain_6',
                            """Directory where to write event logs' parent.""")
 tf.app.flags.DEFINE_string('checkpoint_dir', '/home/laoreja/tf/log/kitti_from_retrain_6/train',
@@ -71,7 +56,7 @@ def eval_once(saver, summary_writer, op_list, summary_op):
   Args:
     saver: Saver.
     summary_writer: Summary writer.
-    top_k_op: Top K op.
+    op_list: List of ops for evaluation. Need computing the average of each of them.
     summary_op: Summary op.
   """
   len_op_list = len(op_list)
@@ -88,8 +73,6 @@ def eval_once(saver, summary_writer, op_list, summary_op):
     else:
       print('No checkpoint file found')
       return
-    
-#    tf.train.start_queue_runners(sess=sess)
 
     # Start the queue runners.
     coord = tf.train.Coordinator()
@@ -103,7 +86,7 @@ def eval_once(saver, summary_writer, op_list, summary_op):
       num_iter = NUM_EVAL_SAMPLES
       avg_list = [0.0 for i in range(len_op_list)]
       step = 0
-      while step < num_iter:# and not coord.should_stop():
+      while step < num_iter and not coord.should_stop():
         res_list = sess.run(op_list)
         for i in range(len_op_list):
           avg_list[i] += res_list[i]
@@ -115,7 +98,7 @@ def eval_once(saver, summary_writer, op_list, summary_op):
           summary_str = sess.run(summary_op)
           summary_writer.add_summary(summary_str, step)
 
-      # Compute precision @ 1.
+      # Compute averages of evaluating criteria
       for i in range(len_op_list):
         avg_list[i] /= (num_iter * 1.0)
       
@@ -134,9 +117,9 @@ def eval_once(saver, summary_writer, op_list, summary_op):
 
 
 def evaluate(hps, dataset):
-  """Eval CIFAR-10 for a number of steps."""
+  """Eval for a number of steps."""
   with tf.Graph().as_default() as g:
-    # Get images and labels for CIFAR-10.
+    # Get inputs. You may write them to summary.
     num_preprocess_threads = FLAGS.num_preprocess_threads
     left_images, right_images, disparitys, masks = image_processing_KITTI.inputs(
                 dataset,
@@ -149,7 +132,7 @@ def evaluate(hps, dataset):
     tf.summary.image('masks', tmp)
     tf.summary.image('masked_disparity', tf.expand_dims(disparitys * masks, axis=3))
 
-    # Build a Graph that computes the logits predictions from the
+    # Build a Graph that computes the disparity predictions from the
     # inference model.
     model = gcnet_model.GCNet(hps, left_images, right_images, disparitys, masks, 'eval') # 
     model.build_graph_to_loss()
@@ -188,11 +171,10 @@ def main(argv=None):  # pylint: disable=unused-argument
     tf.gfile.DeleteRecursively(FLAGS.eval_dir)
   tf.gfile.MakeDirs(FLAGS.eval_dir)
 
-
+# Indeed, the lrn_rate and weight_decay_rate have no use.
   hps = gcnet_model.HParams(batch_size=BATCH_SIZE,
-#                             min_lrn_rate=0.0001,
-                             lrn_rate=0.001,
-                             weight_decay_rate=0.0002,
+                             lrn_rate=0.0,
+                             weight_decay_rate=0.0,
                              relu_leakiness=0.1,
                              optimizer='RMSProp',
                              max_disparity=192) 
