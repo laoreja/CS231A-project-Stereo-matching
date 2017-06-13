@@ -49,14 +49,15 @@ class GCNet(object):
   """GCNet model."""
 
   def __init__(self, hps, left_images, right_images, gt_disparity, mask, mode): 
-  """GC-Net constructor.
+    """
+    GC-Net constructor.
 
-  Args:
-    hps: Hyperparameters.
-    left_images, right_images: Batches of images. [batch_size, image_height, image_width, 3]
-    gt_disparity, mask: Batches of disparity, mask. [batch_size, image_height, image_width]
-    mode: One of 'train', 'eval' and 'predict'.
-  """
+    Args:
+      hps: Hyperparameters.
+      left_images, right_images: Batches of images. [batch_size, image_height, image_width, 3]
+      gt_disparity, mask: Batches of disparity, mask. [batch_size, image_height, image_width]
+      mode: One of 'train', 'eval' and 'predict'.
+    """
     self.hps = hps
     self._left_images = left_images
     self._right_images = right_images

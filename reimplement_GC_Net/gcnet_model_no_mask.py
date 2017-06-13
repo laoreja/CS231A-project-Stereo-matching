@@ -224,9 +224,9 @@ class GCNet(object):
       #        tf.summary.image('gt', tf.expand_dims(self.gt_disparity, axis=3))                    
       tf.summary.image('predict', tf.expand_dims(self.predicted_disparity, axis=3))  
       if self.mode == 'eval':
-        self.larger_than_3px = tf.reduce_mean(tf.cast(tf.greater(abs_error, 3), tf.float32))
-        self.larger_than_5px = tf.reduce_mean(tf.cast(tf.greater(abs_error, 5), tf.float32))
-        self.larger_than_7px = tf.reduce_mean(tf.cast(tf.greater(abs_error, 3), tf.float32))
+        self.larger_than_3px = tf.reduce_mean(tf.cast(tf.greater(self.abs_loss, 3), tf.float32))
+        self.larger_than_5px = tf.reduce_mean(tf.cast(tf.greater(self.abs_loss, 5), tf.float32))
+        self.larger_than_7px = tf.reduce_mean(tf.cast(tf.greater(self.abs_loss, 3), tf.float32))
         
 #      tf.summary.histogram('loss_gradints', tf.gradients(self.total_loss, self.predicted_disparity)[0])
       

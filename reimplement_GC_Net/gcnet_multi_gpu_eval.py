@@ -23,10 +23,10 @@ import sys, os
 from datetime import datetime
 import re
 
-import stereo_input
 import numpy as np
 import tensorflow as tf
 
+import gcnet_model_no_mask
 import gcnet_model
 #import image_processing_KITTI
 #from KITTI_data import KITTIData
@@ -48,12 +48,16 @@ tf.app.flags.DEFINE_boolean('log_device_placement', False,
 #tf.app.flags.DEFINE_string('mode', 'eval', 'train, resume, retrain')
 tf.app.flags.DEFINE_boolean('debug', False,
               """Whether to show verbose summaries.""")
-tf.app.flags.DEFINE_string('ckpt_path', '/home/laoreja/tf/log/gcnet_retrain_6/train', "path of ckpt for resume training")              
-
+tf.app.flags.DEFINE_string('ckpt_path', '/home/laoreja/tf/log/gcnet_retrain_6/train', "path of ckpt for resume training")      
+tf.app.flags.DEFINE_boolean('with_mask', True,
+              """Whether to use masks.""")
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # cannot see print!
+# TODO: merge the mask/no mask, different dataset versions.
+
 
 def tower_loss(scope, hps, dataset):
-  """Calculate the total loss on a single tower running the GC-Net model.
+  """
+  Calculate the total loss on a single tower running the GC-Net model.
 
   Args:
     scope: unique prefix string identifying the GC-Net tower, e.g. 'tower_0'
@@ -69,7 +73,7 @@ def tower_loss(scope, hps, dataset):
                   num_preprocess_threads=num_preprocess_threads)
 
   # Build inference Graph.
-  model = gcnet_model.GCNet(hps, left_images, right_images, disparitys, masks, 'eval') 
+  model = this_model.GCNet(hps, left_images, right_images, disparitys, masks, 'eval') 
   model.build_graph_to_loss()
   
   return model.abs_loss, model.larger_than_3px, model.larger_than_5px, model.larger_than_7px, model.variables_to_restore #model.summaries
@@ -86,7 +90,7 @@ def evaluate(hps, dataset):
     with tf.variable_scope(tf.get_variable_scope()):
       for i in xrange(FLAGS.num_gpus):
         with tf.device('/gpu:%d' % i):
-          with tf.name_scope('%s_%d' % (gcnet_model.TOWER_NAME, i)) as scope:
+          with tf.name_scope('%s_%d' % (this_model.TOWER_NAME, i)) as scope:
             if i == 0:
               loss, px3, px5, px7, total_variables_to_restore = tower_loss(scope, hps, dataset)
             else:
@@ -177,8 +181,14 @@ def main(_):
   if tf.gfile.Exists(FLAGS.eval_dir):
     tf.gfile.DeleteRecursively(FLAGS.eval_dir)
   tf.gfile.MakeDirs(FLAGS.eval_dir)
+  
+  global this_model
+  if FLAGS.with_mask:
+    this_model = gcnet_model
+  else:
+    this_model = gcnet_model_no_mask
 
-  hps = gcnet_model.HParams(batch_size=BATCH_SIZE,
+  hps = this_model.HParams(batch_size=BATCH_SIZE,
                              lrn_rate=0.0,
                              weight_decay_rate=0.0,
                              relu_leakiness=0.1,
