@@ -13,7 +13,9 @@
 # limitations under the License.
 # ==============================================================================
 
-"""ResNet Train/Eval module.
+"""
+GC-Net Eval module.
+Using multiple GPUs.
 """
 import time
 import six
@@ -40,7 +42,7 @@ tf.app.flags.DEFINE_string('log_root', '',
                            'parent directory of FLAGS.train_dir/eval_dir.')
 tf.app.flags.DEFINE_integer('num_gpus', 3,
                             'Number of gpus used for training. (0 or 1)')
-tf.app.flags.DEFINE_integer('max_steps', 1614, 'max steps for training')                            
+tf.app.flags.DEFINE_integer('max_steps', 1614, 'max steps for evaluation')                            
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
               """Whether to log device placement.""")
 #tf.app.flags.DEFINE_string('mode', 'eval', 'train, resume, retrain')
@@ -51,15 +53,15 @@ tf.app.flags.DEFINE_string('ckpt_path', '/home/laoreja/tf/log/gcnet_retrain_6/tr
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # cannot see print!
 
 def tower_loss(scope, hps, dataset):
-  """Calculate the total loss on a single tower running the CIFAR model.
+  """Calculate the total loss on a single tower running the GC-Net model.
 
   Args:
-    scope: unique prefix string identifying the CIFAR tower, e.g. 'tower_0'
-
+    scope: unique prefix string identifying the GC-Net tower, e.g. 'tower_0'
+    hps: hyper parameters to pass into the model
   Returns:
      Tensor of shape [] containing the total loss for a batch of data
   """
-  # Get images and labels for CIFAR-10.
+  # Get inputs.
   num_preprocess_threads = FLAGS.num_preprocess_threads
   left_images, right_images, disparitys, masks = image_processing.inputs(
                   dataset,
@@ -67,20 +69,15 @@ def tower_loss(scope, hps, dataset):
                   num_preprocess_threads=num_preprocess_threads)
 
   # Build inference Graph.
-  model = gcnet_model.GCNet(hps, left_images, right_images, disparitys, masks, 'eval') # 
+  model = gcnet_model.GCNet(hps, left_images, right_images, disparitys, masks, 'eval') 
   model.build_graph_to_loss()
   
   return model.abs_loss, model.larger_than_3px, model.larger_than_5px, model.larger_than_7px, model.variables_to_restore #model.summaries
   
   
-def train(hps, dataset):
-  """Training loop."""
+def evaluate(hps, dataset):
+  """Evaluation."""
   with tf.Graph().as_default(), tf.device('/cpu:0'):
-    # Create a variable to count the number of train() calls. This equals the
-    # number of batches processed * FLAGS.num_gpus.
-    global_step = tf.get_variable(
-      'global_step', [],
-      initializer=tf.constant_initializer(0), trainable=False)
             
     tower_losses = []
     tower_3px = []
@@ -115,7 +112,6 @@ def train(hps, dataset):
     
     # Add a summary to track the learning rate.
 #    summaries.append(model_summary)
-#    summaries.append(tf.summary.scalar('global_step', global_step))  
     
           
     # Track the moving averages of all trainable variables.
@@ -179,28 +175,19 @@ def main(_):
 
   FLAGS.eval_dir = os.path.join(FLAGS.log_root, 'eval')
   if tf.gfile.Exists(FLAGS.eval_dir):
-#    print(FLAGS.train_dir)
-#    res = raw_input('FLAGS.train_dir already exist, whether to delete? Y/[N]')
-#    if res == 'Y':
     tf.gfile.DeleteRecursively(FLAGS.eval_dir)
   tf.gfile.MakeDirs(FLAGS.eval_dir)
-#  else:
-#  if not tf.gfile.Exists(FLAGS.eval_dir):
-#    tf.gfile.MakeDirs(FLAGS.eval_dir)
 
   hps = gcnet_model.HParams(batch_size=BATCH_SIZE,
-#                             min_lrn_rate=0.0001,
-                             lrn_rate=0.00001,
-                             weight_decay_rate=0.0002,
+                             lrn_rate=0.0,
+                             weight_decay_rate=0.0,
                              relu_leakiness=0.1,
                              optimizer='RMSProp',
                              max_disparity=192) 
   print("before train")
-  train(hps, dataset)
+  evaluate(hps, dataset)
 
 
 if __name__ == '__main__':
-  print("in main")
-  tf.logging.info("in main info")
   tf.logging.set_verbosity(tf.logging.INFO)
   tf.app.run()

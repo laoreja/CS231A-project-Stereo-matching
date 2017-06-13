@@ -13,7 +13,9 @@
 # limitations under the License.
 # ==============================================================================
 
-"""ResNet Train/Eval module.
+"""
+GC-Net Train module.
+Using multiple GPUs.
 """
 import time
 import six
@@ -51,18 +53,20 @@ tf.app.flags.DEFINE_boolean('debug', True,
               """Whether to show verbose summaries.""")
 tf.app.flags.DEFINE_string('ckpt_path', '/home/laoreja/tf/log/kitti_from_retrain_6/train', "path of ckpt for resume training")              
 
-#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # cannot see print!
+#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+# will supress verbose log info
+# but cannot see print!
 
 def tower_loss(scope, hps, dataset):
-  """Calculate the total loss on a single tower running the CIFAR model.
+  """Calculate the total loss on a single tower running the GC-Net model.
 
   Args:
-    scope: unique prefix string identifying the CIFAR tower, e.g. 'tower_0'
-
+    scope: unique prefix string identifying the GC-Net tower, e.g. 'tower_0'
+    hps: hyper parameters to pass into the model
   Returns:
      Tensor of shape [] containing the total loss for a batch of data
   """
-  # Get images and labels for CIFAR-10.
+  # Get inputs.
   num_preprocess_threads = FLAGS.num_preprocess_threads
   left_images, right_images, disparitys, masks = image_processing_KITTI.distorted_inputs(
                   dataset,
@@ -70,7 +74,7 @@ def tower_loss(scope, hps, dataset):
                   num_preprocess_threads=num_preprocess_threads)
 
   # Build inference Graph.
-  model = gcnet_model.GCNet(hps, left_images, right_images, disparitys, masks, 'train') # 
+  model = gcnet_model.GCNet(hps, left_images, right_images, disparitys, masks, 'train') 
   model.build_graph_to_loss()
   
 #  summary_name = ['abs_loss', 'total_loss']
@@ -80,7 +84,7 @@ def tower_loss(scope, hps, dataset):
   loss_name = re.sub('%s_[0-9]*/' % gcnet_model.TOWER_NAME, '', model.total_loss.op.name+'_total')
   tf.summary.scalar(loss_name, model.total_loss)
   
-  return model.total_loss, model.variables_to_restore, model.summaries#, model.debug_op_list[0]
+  return model.total_loss, model.variables_to_restore, model.summaries#, model.debug_op_list
   
 def average_gradients(tower_grads):
   """Calculate the average gradient for each shared variable across all towers.
@@ -157,7 +161,7 @@ def train(hps, dataset):
             # Retain the summaries from the final tower.
             summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
             
-            # Calculate the gradients for the batch of data on this CIFAR tower.
+            # Calculate the gradients for the batch of data on this GC-Net tower.
             grads = opt.compute_gradients(loss)
             
             # Keep track of the gradients across all towers.
@@ -174,7 +178,8 @@ def train(hps, dataset):
 #    summaries.append(tf.summary.scalar('global_step', global_step))  
     
     if FLAGS.debug:
-      # Add histograms for gradients.
+    # Add histograms for gradients.
+    # the 'DW' in var.op.name filter only outputs the convolution weights, you can remove this one to monitor all the grads and var
       for grad, var in grads:
         if grad is not None and 'DW' in var.op.name:
           summaries.append(tf.summary.histogram(var.op.name + '/gradients', grad))
@@ -259,7 +264,6 @@ def train(hps, dataset):
       assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
 
       if step % 20 == 0:
-#        print('global_step', sess.run(global_step))
         num_examples_per_step = FLAGS.batch_size * FLAGS.num_gpus
         examples_per_sec = num_examples_per_step / duration
         sec_per_batch = duration / FLAGS.num_gpus
@@ -288,18 +292,15 @@ def main(_):
   tf.gfile.MakeDirs(FLAGS.train_dir)
 
   hps = gcnet_model.HParams(batch_size=BATCH_SIZE,
-#                             min_lrn_rate=0.0001,
                              lrn_rate=0.0001,
                              weight_decay_rate=0.0002,
                              relu_leakiness=0.1,
                              optimizer='RMSProp',
                              max_disparity=192) 
-  print("before train")
+
   train(hps, dataset)
 
 
 if __name__ == '__main__':
-  print("in main")
-  tf.logging.info("in main info")
   tf.logging.set_verbosity(tf.logging.INFO)
   tf.app.run()

@@ -13,12 +13,10 @@
 # limitations under the License.
 # ==============================================================================
 
-"""ResNet model.
+"""
+GC-Net model.
 
-Related papers:
-https://arxiv.org/pdf/1603.05027v2.pdf
-https://arxiv.org/pdf/1512.03385v1.pdf
-https://arxiv.org/pdf/1605.07146v1.pdf
+https://arxiv.org/pdf/1703.04309.pdf
 """
 from collections import namedtuple
 
@@ -48,15 +46,15 @@ HParams = namedtuple('HParams',
 
 
 class GCNet(object):
-  """GCNet model."""
+  """GC-Net model."""
 
   def __init__(self, hps, left_images, right_images, gt_disparity, mode): 
-    """ResNet constructor.
+    """GC-Net constructor.
 
     Args:
       hps: Hyperparameters.
-      images: Batches of images. [batch_size, image_size, image_size, 3]
-      labels: Batches of labels. [batch_size, num_classes]
+      left_images, right_images: Batches of images. [batch_size, image_height, image_width, 3]
+      gt_disparity: Batches of disparity. [batch_size, image_height, image_width]
       mode: One of 'train', 'eval' and 'predict'.
     """
     self.hps = hps
@@ -75,22 +73,22 @@ class GCNet(object):
     self.variables_to_restore = tf.get_collection('variable_to_restore')
     self.summaries = tf.summary.merge_all()
 
-#  def build_graph(self):
-#    """Build a whole graph for the model."""
-##    self.global_step = tf.contrib.framework.get_or_create_global_step()
-#    self._build_model()
-#    if self.mode != 'predict':
-#      self._build_loss_op()
-#    if self.mode == 'train':
-#      self._build_train_op()
-#    self.summaries = tf.summary.merge_all()
+  def build_graph(self):
+    """Build a whole graph for the model."""
+#    self.global_step = tf.contrib.framework.get_or_create_global_step()
+    self._build_model()
+    if self.mode != 'predict':
+      self._build_loss_op()
+    if self.mode == 'train':
+      self._build_train_op()
+    self.summaries = tf.summary.merge_all()
 
   def _stride_arr(self, stride):
     """Map a stride scalar to the stride array for tf.nn.conv2d."""
     return [1, stride, stride, 1]
     
   def _stride_3d_arr(self, stride):
-    """Map a stride scalar to the stride array for tf.nn.conv2d."""
+    """Map a stride scalar to the stride array for tf.nn.conv3d."""
     return [1, stride, stride, stride, 1]
 
   def _build_model(self):
@@ -233,7 +231,7 @@ class GCNet(object):
 #      tf.summary.histogram('loss_gradints', tf.gradients(self.total_loss, self.predicted_disparity)[0])
       
   def _add_loss_summaries(self):
-    """Add summaries for losses in CIFAR-10 model.
+    """Add summaries for losses in GC-Net model.
 
     Generates moving average for all losses and associated summaries for
     visualizing the performance of the network.
@@ -366,7 +364,7 @@ class GCNet(object):
       return tf.nn.conv2d(x, kernel, strides, padding='SAME')
       
   def _conv3d(self, name, x, filter_size, in_filters, out_filters, strides):
-    """Convolution."""
+    """Convolution 3D."""
     with tf.variable_scope(name):
       n = filter_size * filter_size * filter_size * out_filters
       kernel = self._variable_on_cpu(
@@ -376,7 +374,7 @@ class GCNet(object):
       return tf.nn.conv3d(x, kernel, strides, padding='SAME')
       
   def _conv3d_trans(self, name, x, filter_size, in_filters, out_filters, strides, output_shape):
-    """Convolution."""
+    """Convolution 3D transpose."""
     with tf.variable_scope(name):
       n = filter_size * filter_size * filter_size * out_filters
       kernel = self._variable_on_cpu(

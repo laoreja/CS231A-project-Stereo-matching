@@ -13,22 +13,11 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Evaluation for CIFAR-10.
+"""
+Obtain timeline analysis for GC-Net.
+To know which part makes it slow when running on CPU.
+It is much faster when running on GPU(s).
 
-Accuracy:
-cifar10_train.py achieves 83.0% accuracy after 100K steps (256 epochs
-of data) as judged by cifar10_eval.py.
-
-Speed:
-On a single Tesla K40, cifar10_train.py processes a single batch of 128 images
-in 0.25-0.35 sec (i.e. 350 - 600 images /sec). The model reaches ~86%
-accuracy after 100K steps in 8 hours of training time.
-
-Usage:
-Please see the tutorial and website for how to download the CIFAR-10
-data set, compile the program and train the model.
-
-http://tensorflow.org/tutorials/deep_cnn/
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -45,13 +34,10 @@ import gcnet_model
 import image_processing
 from SceneFlow_data import SceneFlowData
 from tensorflow.python.client import timeline
-
-
 #from tensorflow.python import debug as tf_debug
 
 FLAGS = tf.app.flags.FLAGS
 BATCH_SIZE = 1
-NUM_EVAL_SAMPLES = 4843
 
 #tf.app.flags.DEFINE_string('dataset', 'SceneFlow', '')
 tf.app.flags.DEFINE_string('mode', 'eval', 'mode')
@@ -73,7 +59,7 @@ def eval_once(saver, summary_writer, abs_loss, total_loss, summary_op):
   Args:
     saver: Saver.
     summary_writer: Summary writer.
-    top_k_op: Top K op.
+    abs_loss, total_loss: two loss ops.
     summary_op: Summary op.
   """
   with tf.Session(config=tf.ConfigProto(allow_soft_placement = True)) as sess:
@@ -98,7 +84,7 @@ def eval_once(saver, summary_writer, abs_loss, total_loss, summary_op):
     avg_abs_loss = 0.0
     avg_total_loss = 0.0
     step = 0
-    while step < num_iter:# and not coord.should_stop():
+    while step < num_iter and not coord.should_stop():
       run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
       run_metadata = tf.RunMetadata()
       got_abs_loss, got_total_loss = sess.run([abs_loss, total_loss], options=run_options, run_metadata=run_metadata)
@@ -114,7 +100,6 @@ def eval_once(saver, summary_writer, abs_loss, total_loss, summary_op):
       avg_total_loss += got_total_loss
       step += 1
 
-    # Compute precision @ 1.
     avg_abs_loss /= num_iter
     avg_total_loss /= num_iter
     print('%s: avg abs, total losses = %f, %f' % (datetime.now(), avg_abs_loss, avg_total_loss))
@@ -161,11 +146,12 @@ def evaluate(hps, dataset):
 def main(argv=None):  # pylint: disable=unused-argument
   dataset = SceneFlowData('debug')
   assert dataset.data_files()
+  global NUM_EVAL_SAMPLES
+  NUM_EVAL_SAMPLES = dataset.num_examples_per_epoch()
   
   FLAGS.eval_dir = os.path.join(FLAGS.log_root, 'eval')
 
   hps = gcnet_model.HParams(batch_size=BATCH_SIZE,
-#                             min_lrn_rate=0.0001,
                              lrn_rate=0.001,
                              weight_decay_rate=0.0002,
                              relu_leakiness=0.1,
