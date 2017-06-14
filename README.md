@@ -110,3 +110,4 @@ The GPU I use is TITAN X, 12G memory is not small. I wonder how the authors mana
 
 For more details, please refer to the `final_report.pdf` and `supplemental.pdf` in this repo.
 
+Since I sorted the files recently, there may exist some bugs, feel free to report them.
