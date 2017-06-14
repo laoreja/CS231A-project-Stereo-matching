@@ -187,6 +187,7 @@ def main(_):
         this_model = gcnet_model
     else:
         this_model = gcnet_model_no_mask
+        tf.logging.info("NO MASK VERSION")
 
     hps = this_model.HParams(batch_size=BATCH_SIZE,
                                                          lrn_rate=0.0,

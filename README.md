@@ -51,7 +51,7 @@ The scripts whose names contain 'no_mask' are for the no-mask-version, others ar
 
 First, you need to run the `build_image_data_xxx.py` to convert the data into tfrecords. 
 For SceneFlow, you need to run `SceneFlow_divide_test_train.py` first to divide the train/test partitions and save the info in a pickle. 
-If you download the webp formatted data for SceneFlow, you need to run `web2png.py` to transform the image format. And you need the dwebp tool.
+If you download the webp formatted data for SceneFlow, you need to run `web2png.py` to transform the image format. And you will need the dwebp tool.
 
 To train, for example, train on SceneFlow with 4 GPUS:
 
@@ -65,6 +65,26 @@ To evaluate,
 ```
 python gcnet_eval.py --log_root xxx --checkpoint_dir xxx --run_once True 2>&1 | tee train_log
 ```
+
+To summarize, here is the list of all the source code files' use:
+
+| Filename        | Use  |
+| :------------- |:----:|
+| webp2png.py | Transform the image format for SceneFlow. |
+| pfm.py | Load/Save pfm disparity information for Sceneflow. |
+| uint16png.py | Load uint16 png file for KITTI. |
+| timeline.py | Obtain the timeline.json to analysis the time usage.|
+| SceneFlow_divide_test_train.py | Divide the Sceneflow dataset into train and test subsets, saving in a pickle. |
+| build_image_data_xxx.py | Transfer xxx dataset into tfrecords |
+| dataset.py | The abstract dataset class. |
+| xxx_data.py | The inherited xxx dataset class. |
+| image_processing_xxx[_no_mask].py | Image processing module, build input for the model. |
+| test_image_processing[_KITTI].py | Test the image processing module. |
+| gcnet_model[_no_mask].py | The model definition. |
+| gcnet_train.py | Train on a single CPU or GPU. |
+| gcnet_multi_gpu_train[_KITTI/_no_mask].py | Train on multiple GPUs. |
+|gcnet_multi_gpu_eval[_no_mask].py | Eval on multiple GPUs. |
+
 
 ## Problems I met 
 
@@ -82,7 +102,7 @@ Besides, if I use H=540 and W=960, the GPU memory is not enough. So what I met i
 
 The GPU I use is TITAN X, 12G memory is not small. I wonder how the authors manage to do so (they also say they use TITAN X GPU).
 
-* The evaluation runs extremely slowly on CPU, but runs well on GPU. I located the problem to the last `conv3d_transpose` layer. I think this is a problem with TensorFlow, so I raised an [issue](https://github.com/tensorflow/tensorflow/issues/10535).
+* The evaluation runs extremely slowly on CPU, but runs well on GPU. I located the problem to the last `conv3d_transpose` layer. I think this is a problem with TensorFlow, so I raised an [issue here](https://github.com/tensorflow/tensorflow/issues/10535).
 
 <!-- Since it's my first time using TensorFlow, I met lots of problems. In my experience playing with other frameworks, the common practice is to do validation after training some epochs. But for TensorFlow, someone says it's better and safer using separate processes, and we can use CPU to do validation. If the CPU performance is not good, then it will work -->
 
