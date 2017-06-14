@@ -224,9 +224,9 @@ class GCNet(object):
       #        tf.summary.image('gt', tf.expand_dims(self.gt_disparity, axis=3))                    
       tf.summary.image('predict', tf.expand_dims(self.predicted_disparity, axis=3))  
       if self.mode == 'eval':
-        self.larger_than_3px = tf.reduce_mean(tf.cast(tf.greater(self.abs_loss, 3), tf.float32))
-        self.larger_than_5px = tf.reduce_mean(tf.cast(tf.greater(self.abs_loss, 5), tf.float32))
-        self.larger_than_7px = tf.reduce_mean(tf.cast(tf.greater(self.abs_loss, 3), tf.float32))
+        self.larger_than_3px = tf.reduce_mean(tf.cast(tf.greater(tf.abs(self.gt_disparity - self.predicted_disparity), 3), tf.float32))
+        self.larger_than_5px = tf.reduce_mean(tf.cast(tf.greater(tf.abs(self.gt_disparity - self.predicted_disparity), 5), tf.float32))
+        self.larger_than_7px = tf.reduce_mean(tf.cast(tf.greater(tf.abs(self.gt_disparity - self.predicted_disparity), 3), tf.float32))
         
 #      tf.summary.histogram('loss_gradints', tf.gradients(self.total_loss, self.predicted_disparity)[0])
       
@@ -423,14 +423,15 @@ class GCNet(object):
         self._extra_train_ops.append(moving_averages.assign_moving_average(
             moving_variance, variance, BATCHNORM_MOVING_AVERAGE_DECAY))
       else:
-        mean = self._variable_on_cpu(
-            'moving_mean', params_shape,
-            initializer=tf.constant_initializer(0.0, tf.float32),
-            trainable=False)
-        variance = self._variable_on_cpu(
-            'moving_variance', params_shape,
-            initializer=tf.constant_initializer(1.0, tf.float32),
-            trainable=False)
+        mean, variance = tf.nn.moments(x, range(len(x.get_shape())-1), name='moments')
+#        mean = self._variable_on_cpu(
+#            'moving_mean', params_shape,
+#            initializer=tf.constant_initializer(0.0, tf.float32),
+#            trainable=False)
+#        variance = self._variable_on_cpu(
+#            'moving_variance', params_shape,
+#            initializer=tf.constant_initializer(1.0, tf.float32),
+#            trainable=False)
 #        tf.summary.histogram(mean.op.name, mean)
 #        tf.summary.histogram(variance.op.name, variance)
       # elipson used to be 1e-5. Maybe 0.001 solves NaN problem in deeper net.
