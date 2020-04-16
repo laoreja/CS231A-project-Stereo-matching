@@ -94,7 +94,7 @@ One bad results:
 
 <img src="https://raw.githubusercontent.com/laoreja/CS231A-project-stereo-matching/master/qualitative_results/SceneFlow_train_with_mask/wrong_left.png" width=290px/> <img src="https://raw.githubusercontent.com/laoreja/CS231A-project-stereo-matching/master/qualitative_results/SceneFlow_train_with_mask/wrong_gt.png" width=290px/> <img src="https://raw.githubusercontent.com/laoreja/CS231A-project-stereo-matching/master/qualitative_results/SceneFlow_train_with_mask/wrong_predict.png" width=290px/>
 
-However, using fixed mean and variance should be the more common practice, I don't know what's goes on.
+However, using fixed mean and variance should be the more common practice, I don't know what's going on.
 
 * The GPU memory problem, in the original paper, one place is very confusing, in Section 4.1, they first say they use a 256*512 crop, then they set the H, W to the image size. But H and W exist in Table 1, which is the network's input size, so I am very confused about what they input to the network.
 
