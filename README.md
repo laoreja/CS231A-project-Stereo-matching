@@ -1,4 +1,4 @@
-# CS231A Course project
+# CS231A Course project: Deep Stereo Matching
 
 ## Reimplementation-of-GC-Net
 
@@ -35,7 +35,7 @@ On KITTI testing set, original image and prediction samples:
 
 Since the KITTI dataset is very sparse, the provided groundtruths are with masks, I implement and train the with mask version first. But I found some predictions are very blurry. (My masks are a bit too much). 
 
-Though the qualitative results looks fine, but the quantitative results on SceneFlow test set is not very good. As for KITTI, this is not a satisfying version, so I do not submit it. And due to the limit of time and resources, I do not do validation. I give the quantitative results on the training set for reference. It is very strange that this results are good, maybe overfitting exists, but I train it for less iterations than that is reported in the paper.
+Though the qualitative results looks fine, but the quantitative results on SceneFlow test set is not very good. As for KITTI, this is not a satisfying version, so I do not submit it. And due to the limit of time and resources, I do not do validation. I give the quantitative results on the training set for reference. It is very strange that this results are good. Maybe there is overfitting, but I trained it for less iterations than that is reported in the paper.
 
 | Dataset        | MAE(px) | >3px | >5px  | >7px  |
 | :------------- |:----:|:-----:|:-----:|:-------:| 
@@ -88,7 +88,7 @@ To summarize, here is the list of all the source code files' use:
 
 ## Problems I met 
 
-* For the with-mask-version (the without-mask-version is still training), During evaluation, if using a fixed mean and variance (during training, we would estimate a mean and variance, this is what the Resnet model do), the results are terrible. If changing that, using the real-time mean and variance, results are better.
+* For the with-mask-version (the without-mask-version is still training), during evaluation, if using a fixed mean and variance, the results are terrible. If changing that, using the real-time mean and variance, results are better.
 
 One bad results:
 
@@ -96,11 +96,11 @@ One bad results:
 
 However, using fixed mean and variance should be the more common practice, I don't know what's going on.
 
-* The GPU memory problem, in the original paper, one place is very confusing, in Section 4.1, they first say they use a 256*512 crop, then they set the H, W to the image size. But H and W exist in Table 1, which is the network's input size, so I am very confused about what they input to the network.
+* The GPU memory problem, in the original paper, one place is very confusing, in Section 4.1, they first say they use a 256x512 crop, then they set the H, W to the image size. But H and W in Table 1 is the network's input size, so I am very confused about what they input to the network.
 
 Besides, if I use H=540 and W=960, the GPU memory is not enough. So what I met is that, though the network is fully convolutional, I cannot feed the whole image in.
 
-The GPU I use is TITAN X, 12G memory is not small. I wonder how the authors manage to do so (they also say they use TITAN X GPU).
+The GPU I use is TITAN X, 12G memory is not small.
 
 * The evaluation runs extremely slowly on CPU, but runs well on GPU. I located the problem to the last `conv3d_transpose` layer. I think this is a problem with TensorFlow, so I raised an [issue here](https://github.com/tensorflow/tensorflow/issues/10535).
 
@@ -110,4 +110,3 @@ The GPU I use is TITAN X, 12G memory is not small. I wonder how the authors mana
 
 For more details, please refer to the `final_report.pdf` and `supplemental.pdf` in this repo.
 
-Since I sorted the files recently, there may exist some bugs, feel free to report them.
